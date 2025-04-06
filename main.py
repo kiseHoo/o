@@ -1,10 +1,9 @@
+from threading import Thread
+from flask import Flask
 import logging
 import requests
 import base64
 from datetime import datetime
-from flask import Flask
-from threading import Thread
-
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application, CommandHandler, MessageHandler,
@@ -16,24 +15,26 @@ from telegram.ext import (
 BOT_TOKEN = "8034760491:AAEIqcV0xvX6ugpHr05-bVZY6bUM-aGNfjg"
 API_KEY = "SG_b5f8f712e9924783"
 API_ENDPOINT = "https://api.segmind.com/v1/sd2.1-faceswapper"
-
 COOLDOWN_SECONDS = 120
+
 user_last_time = {}
 user_images = {}
-
 GET_FACE, GET_TARGET = range(2)
 
 # --- LOGGING ---
 logging.basicConfig(level=logging.INFO)
 
-# --- FLASK APP ---
+# --- FLASK ---
 flask_app = Flask(__name__)
 
 @flask_app.route('/')
 def home():
     return "Face Swapper Bot is running!"
 
-# --- UTIL FUNCTIONS ---
+def run_flask():
+    flask_app.run(host="0.0.0.0", port=8080)
+
+# --- BOT HANDLERS ---
 def img_url_to_base64(url):
     img_data = requests.get(url).content
     return base64.b64encode(img_data).decode()
@@ -120,8 +121,12 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Cancelled.")
     return ConversationHandler.END
 
-# --- MAIN BOT FUNCTION ---
-def run_bot():
+# --- MAIN ---
+if __name__ == "__main__":
+    # Start Flask in background
+    Thread(target=run_flask).start()
+
+    # Start Telegram bot (in main thread)
     persistence = PicklePersistence(filepath="bot_data")
     application = Application.builder().token(BOT_TOKEN).persistence(persistence).build()
 
@@ -138,12 +143,3 @@ def run_bot():
     application.add_handler(conv_handler)
 
     application.run_polling()
-
-# --- MAIN FLASK FUNCTION ---
-def run_flask():
-    flask_app.run(host="0.0.0.0", port=8080)
-
-# --- RUN BOTH IN PARALLEL ---
-if __name__ == "__main__":
-    Thread(target=run_flask).start()
-    Thread(target=run_bot).start()
