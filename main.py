@@ -108,12 +108,16 @@ async def get_target_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("💮PROCESSING IMAGE... PLEASE WAIT.⚡")
     res = requests.post(API_ENDPOINT, json=payload, headers=headers)
 
-    if res.status_code == 200:
-        with open(f"output_{user_id}.png", "wb") as f:
-            f.write(res.content)
-        await update.message.reply_photo(photo=open(f"output_{user_id}.png", "rb"))
-    else:
-        await update.message.reply_text("Failed to process image.")
+    try:
+        res_json = res.json()
+        if res.status_code == 200 and "output_url" in res_json:
+            output_url = res_json["output_url"]
+            await update.message.reply_photo(photo=output_url)
+        else:
+            await update.message.reply_text("Failed to process image. Try again later.")
+    except Exception as e:
+        logging.error(f"Error parsing response: {e}")
+        await update.message.reply_text("Something went wrong while processing.")
 
     return ConversationHandler.END
 
@@ -123,10 +127,8 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # --- MAIN ---
 if __name__ == "__main__":
-    # Start Flask in background
     Thread(target=run_flask).start()
 
-    # Start Telegram bot (in main thread)
     persistence = PicklePersistence(filepath="bot_data")
     application = Application.builder().token(BOT_TOKEN).persistence(persistence).build()
 
